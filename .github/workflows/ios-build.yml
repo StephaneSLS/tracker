@@ -27,4 +27,34 @@ jobs:
             -project MiniCutTracker.xcodeproj \
             -scheme MiniCutTracker \
             -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Boot simulator and capture screenshots
+        run: |
+          set -euo pipefail
+          UDID=$(python3 .github/scripts/pick_simulator.py)
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          APP_PATH="build/Build/Products/Debug-iphonesimulator/MiniCutTracker.app"
+          xcrun simctl install "$UDID" "$APP_PATH"
+          mkdir -p screenshots
+          xcrun simctl launch "$UDID" com.stephanesls.MiniCutTracker -ScreenshotTour YES
+          sleep 1.5
+          xcrun simctl io "$UDID" screenshot screenshots/01-jour.png
+          sleep 3.5
+          xcrun simctl io "$UDID" screenshot screenshots/02-tendance.png
+          sleep 3.5
+          xcrun simctl io "$UDID" screenshot screenshots/03-historique.png
+          sleep 3.5
+          xcrun simctl io "$UDID" screenshot screenshots/04-reglages.png
+          xcrun simctl terminate "$UDID" com.stephanesls.MiniCutTracker || true
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/*.png
+          if-no-files-found: warn
