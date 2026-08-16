@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Mini-Cut — Carnet de pesée</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+  :root {
+    --paper: #EFF2F5; --card: #FFFFFF;
+    --ink: #1B2A4A; --ink-soft: #52607A; --muted: #8B95A5;
+    --stamp: #B7311E; --stamp-soft: #E7C9C3;
+    --rule: #D9DEE6; --green: #1E7A5C; --amber: #A9660A;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    background-image:
+      linear-gradient(var(--rule) 1px, transparent 1px);
+    background-size: 100% 32px;
+    color: var(--ink); font-family: 'IBM Plex Sans', -apple-system, sans-serif; min-height: 100vh;
+  }
+  .app { max-width: 480px; margin: 0 auto; padding: env(safe-area-inset-top, 22px) 18px calc(env(safe-area-inset-bottom, 20px) + 28px); }
+
+  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+  .title { font-family: 'Bebas Neue', sans-serif; font-size: 40px; letter-spacing: 1px; line-height: 0.95; margin: 2px 0 2px; }
+  .title .accent { color: var(--stamp); }
+  .subtitle { font-size: 12px; color: var(--ink-soft); }
+  .header { padding: 6px 2px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .save-state { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--green); letter-spacing: 1px; padding-top: 4px; }
+
+  .date-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .date-row input[type=date] {
+    background: var(--card); border: 1px solid var(--rule); color: var(--ink);
+    border-radius: 4px; padding: 9px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; flex: 1;
+  }
+  .today-btn { background: var(--ink); border: none; color: #fff; border-radius: 4px; padding: 9px 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  .sheet {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 18px; margin-bottom: 16px;
+    box-shadow: 0 1px 0 rgba(27,42,74,0.03), 0 6px 16px rgba(27,42,74,0.05);
+  }
+  .sheet-label {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .sheet-label::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+
+  /* ---- Tampon de pesée (élément signature) ---- */
+  .stamp-row { display: flex; align-items: center; gap: 18px; }
+  .stamp {
+    width: 118px; height: 118px; border-radius: 50%; flex-shrink: 0;
+    border: 3px double var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transform: rotate(-3deg); position: relative;
+  }
+  .stamp::before {
+    content: ""; position: absolute; inset: 8px; border: 1px solid var(--ink); border-radius: 50%; opacity: 0.35;
+  }
+  .stamp .val { font-family: 'Bebas Neue', sans-serif; font-size: 34px; line-height: 1; color: var(--ink); }
+  .stamp .unit { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--ink-soft); margin-top: 2px; }
+  .stamp.off-track { border-color: var(--stamp); }
+  .stamp.off-track .val { color: var(--stamp); }
+
+  .stamp-meta { flex: 1; }
+  .stamp-meta .delta { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; }
+  .stamp-meta .delta.good { color: var(--green); }
+  .stamp-meta .delta.warn { color: var(--amber); }
+  .stamp-meta .range { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .weight-input-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; border-top: 1px dashed var(--rule); padding-top: 14px; }
+  .weight-input-row label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; width: 90px; }
+  .weight-input-row input { flex: 1; background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 9px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; }
+
+  /* ---- Carte à pointer (jours de suivi) ---- */
+  .punch-row { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; margin-top: 14px; }
+  .punch { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; border: 1.5px dashed var(--rule);
+    display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
+  .punch.filled { background: var(--ink); border: 1.5px solid var(--ink); color: #fff; }
+  .punch.today { border: 1.5px solid var(--stamp); border-style: solid; }
+
+  /* ---- Feuille ligne pour la nutrition ---- */
+  .ruled-item { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .ruled-item:last-of-type { border-bottom: none; }
+  .ruled-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .ruled-label { font-size: 13px; color: var(--ink); font-weight: 500; }
+  .ruled-value { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--ink-soft); }
+  .ruled-track { position: relative; height: 5px; background: var(--paper); border-radius: 3px; overflow: hidden; }
+  .ruled-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+  .calorie-note { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .field-grid.two { grid-template-columns: 1fr 1fr; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  .field input { background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; width: 100%; }
+
+  .toggle-row { display: flex; gap: 10px; }
+  .toggle-btn { flex: 1; padding: 11px; border-radius: 4px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink-soft); font-size: 13px; font-weight: 600; text-align: center; }
+  .toggle-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .zone2-input { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
+  .zone2-input label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .zone2-input input { background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; width: 80px; }
+
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+  .summary-card { background: var(--card); padding: 12px 14px; }
+  .summary-card .label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-card .value { font-family: 'Bebas Neue', sans-serif; font-size: 26px; margin-top: 2px; color: var(--ink); }
+
+  .chart-wrap { height: 150px; margin-top: 16px; }
+  .empty-note { font-size: 12px; color: var(--muted); text-align: center; padding: 22px 0; font-style: italic; }
+
+  .history-toggle { width: 100%; background: none; border: none; font-family: 'IBM Plex Mono', monospace; color: var(--muted); font-size: 11px; padding: 8px 0; text-align: center; letter-spacing: 1px; text-transform: uppercase; }
+  .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; border-bottom: 1px dashed var(--rule); font-family: 'IBM Plex Mono', monospace; font-size: 12px; cursor: pointer; }
+  .history-row:last-child { border-bottom: none; }
+  .history-date { color: var(--ink-soft); width: 90px; text-transform: capitalize; }
+  .history-weight { color: var(--ink); font-weight: 600; }
+  .history-cal { color: var(--muted); }
+
+  .delete-btn { margin-top: 14px; width: 100%; background: none; border: 1px dashed var(--stamp); color: var(--stamp); border-radius: 4px; padding: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+  input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+  input:focus, button:focus { outline: 2px solid var(--stamp-soft); outline-offset: 1px; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+const TARGETS = { calories: 2000, protein: 133, fat: 70, carbs: 210, steps: 10000 };
+const KCAL_PER_1000_STEPS = 40; // estimation moyenne de calories brûlées par tranche de 1000 pas
+
+function adjustedCalorieTarget(steps) {
+  const s = steps === "" || steps === null || isNaN(steps) ? TARGETS.steps : Number(steps);
+  const diffSteps = TARGETS.steps - s; // positif si moins de pas que la référence
+  const adjustment = (diffSteps / 1000) * KCAL_PER_1000_STEPS;
+  return Math.round(TARGETS.calories - adjustment);
+}
+const START_WEIGHT = 74, GOAL_WEIGHT = 70;
+const STORAGE_KEY = "minicut-entries-v1";
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const dayLabel = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
+const emptyEntry = () => ({ weight: "", calories: "", protein: "", fat: "", carbs: "", steps: "", muscu: false, zone2: "" });
+
+let entries = {};
+try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch (e) { entries = {}; }
+let currentDate = todayISO();
+let showHistory = false;
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  const el = document.getElementById("save-state");
+  if (el) { el.textContent = "✓ noté"; setTimeout(() => { if (el) el.textContent = ""; }, 1200); }
+}
+function getEntry(date) { return entries[date] || emptyEntry(); }
+function updateField(field, value) { entries[currentDate] = { ...getEntry(currentDate), [field]: value }; save(); render(); }
+function deleteEntry() { delete entries[currentDate]; save(); render(); }
+function sortedDates() { return Object.keys(entries).filter(d => entries[d].weight !== "").sort(); }
+function weeklyAverages() {
+  const dates = sortedDates();
+  const rows = dates.map(d => ({ date: d, weight: Number(entries[d].weight) }));
+  return rows.map((r, i) => {
+    const win = rows.slice(Math.max(0, i - 6), i + 1);
+    const avg = win.reduce((s, x) => s + x.weight, 0) / win.length;
+    return { ...r, avg: Math.round(avg * 10) / 10 };
+  });
+}
+function setDate(d) { currentDate = d; render(); }
+function goToday() { currentDate = todayISO(); render(); }
+function toggleHistory() { showHistory = !showHistory; render(); }
+
+// ---- Tampon de pesée ----
+function renderStamp(value) {
+  const v = value === "" || value === null || isNaN(value) ? null : Number(value);
+  const display = v !== null ? v.toFixed(1) : "—";
+  const offTrack = v !== null && v > START_WEIGHT + 0.1;
+  const delta = v !== null ? (v - GOAL_WEIGHT).toFixed(1) : null;
+  const onTrack = v !== null && v <= START_WEIGHT + 0.1;
+  return `
+    <div class="stamp-row">
+      <div class="stamp ${offTrack ? "off-track" : ""}">
+        <span class="val">${display}</span><span class="unit">KG</span>
+      </div>
+      <div class="stamp-meta">
+        ${delta !== null
+          ? `<div class="delta ${onTrack ? "good" : "warn"}">${delta > 0 ? "+" + delta : delta} kg vs objectif</div>`
+          : `<div class="delta">Pas encore pesé aujourd'hui</div>`}
+        <div class="range">Départ ${START_WEIGHT} kg &nbsp;→&nbsp; Objectif ${GOAL_WEIGHT} kg</div>
+      </div>
+    </div>`;
+}
+
+// ---- Carte à pointer (14 derniers jours) ----
+function renderPunchCard() {
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+  const today = todayISO();
+  return `<div class="punch-row">${days.map(d => {
+    const filled = entries[d] && entries[d].weight !== "";
+    const isToday = d === today;
+    return `<div class="punch ${filled ? "filled" : ""} ${isToday ? "today" : ""}" title="${d}">${new Date(d + "T00:00:00").getDate()}</div>`;
+  }).join("")}</div>`;
+}
+
+function ruledItem(label, value, target, unit, accent) {
+  const num = value === "" || value === null ? 0 : Number(value);
+  const pct = Math.max(0, Math.min(1, num / target));
+  const over = num > target * 1.05;
+  return `
+    <div class="ruled-item">
+      <div class="ruled-head">
+        <span class="ruled-label">${label}</span>
+        <span class="ruled-value">${num || 0} / ${target} ${unit}</span>
+      </div>
+      <div class="ruled-track"><div class="ruled-fill" style="width:${pct * 100}%;background:${over ? "#B7311E" : accent}"></div></div>
+    </div>`;
+}
+
+function renderCalorieRow(calories, steps) {
+  const target = adjustedCalorieTarget(steps);
+  const num = calories === "" || calories === null ? 0 : Number(calories);
+  const pct = Math.max(0, Math.min(1, num / target));
+  const over = num > target * 1.05;
+  const stepsVal = steps === "" || steps === null || isNaN(steps) ? null : Number(steps);
+  const diff = target - TARGETS.calories;
+  let note;
+  if (stepsVal === null) {
+    note = `Objectif de référence : ${TARGETS.calories} kcal pour ${TARGETS.steps} pas — renseigne tes pas pour ajuster.`;
+  } else if (diff === 0) {
+    note = `${stepsVal} pas — objectif inchangé (${TARGETS.calories} kcal).`;
+  } else if (diff < 0) {
+    note = `${stepsVal} pas, soit ${TARGETS.steps - stepsVal} de moins que la référence → objectif réduit de ${Math.abs(diff)} kcal.`;
+  } else {
+    note = `${stepsVal} pas, soit ${stepsVal - TARGETS.steps} de plus que la référence → objectif relevé de ${diff} kcal.`;
+  }
+  return `
+    <div class="ruled-item">
+      <div class="ruled-head">
+        <span class="ruled-label">Calories</span>
+        <span class="ruled-value">${num || 0} / ${target} kcal</span>
+      </div>
+      <div class="ruled-track"><div class="ruled-fill" style="width:${pct * 100}%;background:${over ? "#B7311E" : "#1B2A4A"}"></div></div>
+      <div class="calorie-note">${note}</div>
+    </div>`;
+}
+
+function renderChart() {
+  const data = weeklyAverages();
+  if (data.length <= 1) return `<div class="empty-note">Note au moins deux pesées pour voir la tendance.</div>`;
+  const w = 440, h = 140, padL = 28, padR = 8, padT = 10, padB = 20;
+  const minY = GOAL_WEIGHT - 1, maxY = START_WEIGHT + 1;
+  const xFor = (i) => padL + (i / (data.length - 1)) * (w - padL - padR);
+  const yFor = (v) => padT + ((maxY - v) / (maxY - minY)) * (h - padT - padB);
+  const weightPts = data.map((d, i) => `${xFor(i)},${yFor(d.weight)}`).join(" ");
+  const avgPts = data.map((d, i) => `${xFor(i)},${yFor(d.avg)}`).join(" ");
+  const goalY = yFor(GOAL_WEIGHT);
+  const labelEvery = Math.ceil(data.length / 5);
+  let labels = "";
+  data.forEach((d, i) => {
+    if (i % labelEvery === 0 || i === data.length - 1) {
+      labels += `<text x="${xFor(i)}" y="${h - 4}" font-size="9" fill="#8B95A5" text-anchor="middle" font-family="IBM Plex Mono">${dayLabel(d.date).slice(0,5)}</text>`;
+    }
+  });
+  return `
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="100%">
+      <line x1="${padL}" y1="${goalY}" x2="${w - padR}" y2="${goalY}" stroke="#B7311E" stroke-width="1.5" stroke-dasharray="3 4"/>
+      <polyline points="${weightPts}" fill="none" stroke="#D9DEE6" stroke-width="1.5"/>
+      <polyline points="${avgPts}" fill="none" stroke="#1B2A4A" stroke-width="2.5"/>
+      ${labels}
+    </svg>`;
+}
+
+function renderHistory() {
+  const dates = [...sortedDates()].reverse();
+  if (dates.length === 0) return `<div class="empty-note">Le carnet est vierge pour l'instant.</div>`;
+  return dates.map(d => `
+    <div class="history-row" onclick="setDate('${d}')">
+      <span class="history-date">${dayLabel(d)}</span>
+      <span class="history-weight">${entries[d].weight} kg</span>
+      <span class="history-cal">${entries[d].calories || "—"} kcal</span>
+    </div>`).join("");
+}
+
+function render() {
+  const current = getEntry(currentDate);
+  const dates = sortedDates();
+  const avgData = weeklyAverages();
+  const weekAvg = avgData.length ? avgData[avgData.length - 1].avg : null;
+  const lastWeight = dates.length ? entries[dates[dates.length - 1]].weight : "";
+  const displayWeight = current.weight !== "" ? current.weight : "";
+
+  document.getElementById("app").innerHTML = `
+    <div class="header">
+      <div>
+        <div class="eyebrow">Carnet de pesée</div>
+        <div class="title">MINI<span class="accent">-</span>CUT</div>
+        <div class="subtitle">${START_WEIGHT} kg → ${GOAL_WEIGHT} kg</div>
+      </div>
+      <div class="save-state" id="save-state"></div>
+    </div>
+
+    <div class="date-row">
+      <input type="date" value="${currentDate}" onchange="setDate(this.value)">
+      ${currentDate !== todayISO() ? `<button class="today-btn" onclick="goToday()">Ce jour</button>` : ""}
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Pesée du jour</div>
+      ${renderStamp(displayWeight || lastWeight)}
+      <div class="weight-input-row">
+        <label>Aujourd'hui</label>
+        <input type="number" step="0.1" inputmode="decimal" placeholder="kg" value="${current.weight}" oninput="updateField('weight', this.value)">
+      </div>
+      ${renderPunchCard()}
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Feuille nutrition</div>
+      ${renderCalorieRow(current.calories, current.steps)}
+      ${ruledItem("Protéines", current.protein, TARGETS.protein, "g", "#1E7A5C")}
+      ${ruledItem("Lipides", current.fat, TARGETS.fat, "g", "#A9660A")}
+      ${ruledItem("Glucides", current.carbs, TARGETS.carbs, "g", "#52607A")}
+      <div class="field-grid">
+        <div class="field"><label>Calories</label><input type="number" inputmode="numeric" value="${current.calories}" oninput="updateField('calories', this.value)"></div>
+        <div class="field"><label>Protéines</label><input type="number" inputmode="numeric" value="${current.protein}" oninput="updateField('protein', this.value)"></div>
+        <div class="field"><label>Lipides</label><input type="number" inputmode="numeric" value="${current.fat}" oninput="updateField('fat', this.value)"></div>
+      </div>
+      <div class="field-grid two">
+        <div class="field"><label>Glucides</label><input type="number" inputmode="numeric" value="${current.carbs}" oninput="updateField('carbs', this.value)"></div>
+        <div class="field"><label>Pas</label><input type="number" inputmode="numeric" value="${current.steps}" oninput="updateField('steps', this.value)"></div>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Séance du jour</div>
+      <div class="toggle-row">
+        <button class="toggle-btn ${current.muscu ? "active" : ""}" onclick="updateField('muscu', ${!current.muscu})">Musculation</button>
+      </div>
+      <div class="zone2-input">
+        <label>Zone 2 (min)</label>
+        <input type="number" inputmode="numeric" value="${current.zone2}" oninput="updateField('zone2', this.value)">
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Bilan</div>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="label">Moy. 7 jours</div><div class="value">${weekAvg !== null ? weekAvg : "—"}</div></div>
+        <div class="summary-card"><div class="label">Écart départ</div><div class="value">${weekAvg !== null ? (weekAvg - START_WEIGHT).toFixed(1) : "—"}</div></div>
+      </div>
+      <div class="chart-wrap">${renderChart()}</div>
+    </div>
+
+    <button class="history-toggle" onclick="toggleHistory()">${showHistory ? "Masquer le carnet" : `Voir le carnet (${dates.length} pesées)`}</button>
+    ${showHistory ? `<div class="sheet">${renderHistory()}</div>` : ""}
+    ${current.weight !== "" ? `<button class="delete-btn" onclick="deleteEntry()">Effacer la pesée du ${dayLabel(currentDate)}</button>` : ""}
+  `;
+}
+
+render();
+</script>
+</body>
+</html>
