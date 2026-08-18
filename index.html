@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Programme — Carnet de suivi</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+  :root {
+    --paper: #EFF2F5; --card: #FFFFFF;
+    --ink: #1B2A4A; --ink-soft: #52607A; --muted: #8B95A5;
+    --stamp: #B7311E; --stamp-soft: #E7C9C3;
+    --rule: #D9DEE6; --green: #1E7A5C; --amber: #A9660A; --blue: #2E5FA3;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    background-image: linear-gradient(var(--rule) 1px, transparent 1px);
+    background-size: 100% 32px;
+    color: var(--ink); font-family: 'IBM Plex Sans', -apple-system, sans-serif; min-height: 100vh;
+  }
+  .app { max-width: 480px; margin: 0 auto; padding: env(safe-area-inset-top, 22px) 18px calc(env(safe-area-inset-bottom, 20px) + 28px); }
+
+  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+  .title { font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 1px; line-height: 0.95; margin: 2px 0 2px; }
+  .title .accent { color: var(--stamp); }
+  .subtitle { font-size: 12px; color: var(--ink-soft); }
+  .header { padding: 6px 2px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .save-state { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--green); letter-spacing: 1px; padding-top: 4px; }
+
+  .date-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .date-row input[type=date] { background: var(--card); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 9px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; flex: 1; }
+  .today-btn { background: var(--ink); border: none; color: #fff; border-radius: 4px; padding: 9px 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  .sheet { background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 0 rgba(27,42,74,0.03), 0 6px 16px rgba(27,42,74,0.05); }
+  .sheet-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .sheet-label::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  .sheet-toggle { background: none; border: none; width: 100%; text-align: left; cursor: pointer; }
+
+  /* Tampon */
+  .stamp-row { display: flex; align-items: center; gap: 18px; }
+  .stamp { width: 110px; height: 110px; border-radius: 50%; flex-shrink: 0; border: 3px double var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotate(-3deg); position: relative; }
+  .stamp::before { content: ""; position: absolute; inset: 8px; border: 1px solid var(--ink); border-radius: 50%; opacity: 0.35; }
+  .stamp .val { font-family: 'Bebas Neue', sans-serif; font-size: 30px; line-height: 1; color: var(--ink); }
+  .stamp .unit { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--ink-soft); margin-top: 2px; }
+  .stamp-meta { flex: 1; }
+  .stamp-meta .delta { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: var(--green); }
+  .stamp-meta .range { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .weight-input-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; border-top: 1px dashed var(--rule); padding-top: 14px; }
+  .weight-input-row label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; width: 90px; }
+  .weight-input-row input { flex: 1; background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 9px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; }
+
+  .punch-row { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; margin-top: 14px; }
+  .punch { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; border: 1.5px dashed var(--rule); display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
+  .punch.filled { background: var(--ink); border: 1.5px solid var(--ink); color: #fff; }
+  .punch.today { border: 1.5px solid var(--stamp); border-style: solid; }
+
+  /* Réglages */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .settings-field { display: flex; flex-direction: column; gap: 4px; }
+  .settings-field label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase; }
+  .settings-field input { background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; width: 100%; }
+  .settings-note { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.5; font-style: italic; }
+
+  /* Activité */
+  .activity-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .activity-btn { flex: 1; min-width: 100px; padding: 10px 6px; border-radius: 4px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink-soft); font-size: 12px; font-weight: 600; text-align: center; }
+  .activity-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .km-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .km-row label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .km-row input { background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; width: 80px; }
+  .steps-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .steps-row label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+  .steps-row input { background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; width: 100px; }
+  .note-row { margin-top: 12px; }
+  .note-row label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px; }
+  .note-row input { width: 100%; background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 8px 10px; font-family: 'IBM Plex Sans'; font-size: 13px; }
+
+  /* Feuille ligne nutrition */
+  .ruled-item { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .ruled-item:last-of-type { border-bottom: none; }
+  .ruled-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .ruled-label { font-size: 13px; color: var(--ink); font-weight: 500; }
+  .ruled-value { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--ink-soft); }
+  .ruled-track { position: relative; height: 5px; background: var(--paper); border-radius: 3px; overflow: hidden; }
+  .ruled-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+  .calorie-note { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  .week-range { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .week-line { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed var(--rule); }
+  .week-line span:first-child { color: var(--ink-soft); }
+  .week-line span:last-child { font-family: 'IBM Plex Mono', monospace; color: var(--ink); text-align: right; }
+  .week-balance { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 700; text-align: center; }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  .field input { background: var(--paper); border: 1px solid var(--rule); color: var(--ink); border-radius: 4px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; width: 100%; }
+
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+  .summary-card { background: var(--card); padding: 12px 14px; }
+  .summary-card .label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-card .value { font-family: 'Bebas Neue', sans-serif; font-size: 24px; margin-top: 2px; color: var(--ink); }
+
+  .chart-wrap { height: 150px; margin-top: 16px; }
+  .empty-note { font-size: 12px; color: var(--muted); text-align: center; padding: 22px 0; font-style: italic; }
+
+  .history-toggle { width: 100%; background: none; border: none; font-family: 'IBM Plex Mono', monospace; color: var(--muted); font-size: 11px; padding: 8px 0; text-align: center; letter-spacing: 1px; text-transform: uppercase; }
+  .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; border-bottom: 1px dashed var(--rule); font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; gap: 6px; }
+  .history-row:last-child { border-bottom: none; }
+  .history-date { color: var(--ink-soft); width: 78px; text-transform: capitalize; flex-shrink: 0; }
+  .history-weight { color: var(--ink); font-weight: 600; flex-shrink: 0; }
+  .history-note { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: right; }
+
+  .measure-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .measure-btn { width: 100%; background: var(--ink); color: #fff; border: none; border-radius: 4px; padding: 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 4px; }
+  .measure-row { display: flex; justify-content: space-between; padding: 8px 2px; border-bottom: 1px dashed var(--rule); font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  .measure-row:last-child { border-bottom: none; }
+  .measure-row span { color: var(--ink-soft); }
+
+  .supp-row { padding: 10px 0; border-bottom: 1px dashed var(--rule); }
+  .supp-row:last-child { border-bottom: none; }
+  .supp-name { font-weight: 600; font-size: 13px; color: var(--ink); }
+  .supp-dose { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--blue); margin-top: 2px; }
+  .supp-detail { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+
+  .delete-btn { margin-top: 14px; width: 100%; background: none; border: 1px dashed var(--stamp); color: var(--stamp); border-radius: 4px; padding: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+  input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+  input:focus, button:focus { outline: 2px solid var(--stamp-soft); outline-offset: 1px; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+const ENTRIES_KEY = "programme-entries-v1";
+const MEASURES_KEY = "programme-mesures-v1";
+const SETTINGS_KEY = "programme-settings-v1";
+
+const DEFAULT_SETTINGS = {
+  poidsBase: 77.7,
+  objectifHebdoKcal: 14000,   // -> 2000 kcal/j de base
+  proteinCibleJour: 133,      // g
+  lipidesCibleJour: 70,       // g
+  stepsCible: 10000,          // pas / jour
+  ajustementMuscu: 450,       // kcal de pénalité si une séance prévue est ratée
+  seancesParSemaine: 4,       // séances de musculation prévues par semaine
+  kcalPour1000Pas: 40,        // ajustement du budget hebdo selon l'écart de pas cumulés
+  ajustementCoursePerKm: 60   // kcal par km couru
+};
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const dayLabel = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
+const emptyEntry = () => ({ weight: "", steps: "", calories: "", protein: "", fat: "", carbs: "", activity: "off", courseKm: "", note: "" });
+function parseNum(v) {
+  if (v === "" || v === null || v === undefined) return null;
+  const n = parseFloat(String(v).replace(",", "."));
+  return isNaN(n) ? null : n;
+}
+
+let entries = {};
+try { entries = JSON.parse(localStorage.getItem(ENTRIES_KEY) || "{}"); } catch (e) { entries = {}; }
+let mesures = {};
+try { mesures = JSON.parse(localStorage.getItem(MEASURES_KEY) || "{}"); } catch (e) { mesures = {}; }
+let settings = { ...DEFAULT_SETTINGS };
+try { settings = { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; } catch (e) {}
+
+let currentDate = todayISO();
+let showHistory = false;
+let showSettings = false;
+let showMeasures = false;
+
+function flashSaved() {
+  const el = document.getElementById("save-state");
+  if (el) { el.textContent = "✓ noté"; setTimeout(() => { if (el) el.textContent = ""; }, 1200); }
+}
+function saveEntries() { localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); flashSaved(); }
+function saveMeasures() { localStorage.setItem(MEASURES_KEY, JSON.stringify(mesures)); flashSaved(); }
+function saveSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); flashSaved(); }
+
+function getEntry(date) { return entries[date] || emptyEntry(); }
+function setEntryField(field, value) { entries[currentDate] = { ...getEntry(currentDate), [field]: value }; saveEntries(); }
+function updateField(field, value) { setEntryField(field, value); render(); }
+function deleteEntry() { delete entries[currentDate]; saveEntries(); render(); }
+function sortedDates() { return Object.keys(entries).filter(d => entries[d].weight !== "").sort(); }
+function weeklyAverages() {
+  const dates = sortedDates();
+  const rows = dates.map(d => ({ date: d, weight: parseNum(entries[d].weight) }));
+  return rows.map((r, i) => {
+    const win = rows.slice(Math.max(0, i - 6), i + 1);
+    const avg = win.reduce((s, x) => s + x.weight, 0) / win.length;
+    return { ...r, avg: Math.round(avg * 10) / 10 };
+  });
+}
+function setDate(d) { currentDate = d; render(); }
+function goToday() { currentDate = todayISO(); render(); }
+function toggleHistory() { showHistory = !showHistory; render(); }
+function toggleSettings() { showSettings = !showSettings; render(); }
+function toggleMeasures() { showMeasures = !showMeasures; render(); }
+
+// ---- Calcul des cibles du jour (règles du programme) ----
+function calorieTargetForDay(entry) {
+  const base = settings.objectifHebdoKcal / 7;
+  let adj = 0;
+  if (entry.activity === "muscu_ratee") adj -= settings.ajustementMuscu;
+  if (entry.activity === "course") adj += (parseNum(entry.courseKm) || 0) * settings.ajustementCoursePerKm;
+  const stepsVal = parseNum(entry.steps);
+  if (stepsVal !== null) adj += ((stepsVal - settings.stepsCible) / 1000) * settings.kcalPour1000Pas;
+  return Math.round(base + adj);
+}
+function macroTargets(entry) {
+  const kcalTarget = calorieTargetForDay(entry);
+  const proteinTarget = settings.proteinCibleJour;
+  const fatTarget = settings.lipidesCibleJour;
+  const proteinKcal = proteinTarget * 4;
+  const fatKcal = fatTarget * 9;
+  const carbsTarget = Math.max(0, Math.round((kcalTarget - proteinKcal - fatKcal) / 4));
+  return { kcalTarget, proteinTarget, fatTarget, carbsTarget };
+}
+
+// ---- Bilan calorique de la semaine (lundi -> dimanche), musculation + pas ----
+function getWeekDates(referenceISO) {
+  const d = new Date(referenceISO + "T00:00:00");
+  const day = d.getDay(); // 0 = dimanche
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(d); monday.setDate(d.getDate() + diffToMonday);
+  const dates = [];
+  for (let i = 0; i < 7; i++) { const dt = new Date(monday); dt.setDate(monday.getDate() + i); dates.push(dt.toISOString().slice(0, 10)); }
+  return dates;
+}
+function weeklyBalance() {
+  const allWeekDates = getWeekDates(todayISO());
+  const today = todayISO();
+  const pastDates = allWeekDates.filter(d => d <= today);
+  let budget = 0, consumed = 0, steps = 0, seancesFaites = 0, seancesRatees = 0, loggedDays = 0;
+  pastDates.forEach(d => {
+    const e = entries[d];
+    if (!e || (e.weight === "" && e.calories === "" && e.steps === "")) { return; } // jour non renseigné : ignoré
+    loggedDays++;
+    budget += calorieTargetForDay(e);
+    consumed += parseNum(e.calories) || 0;
+    steps += parseNum(e.steps) || 0;
+    if (e.activity === "muscu_fait") seancesFaites++;
+    if (e.activity === "muscu_ratee") seancesRatees++;
+  });
+  const stepsTargetSoFar = settings.stepsCible * loggedDays;
+  const balance = Math.round(budget) - consumed;
+  return { weekDates: allWeekDates, pastDates, loggedDays, budget: Math.round(budget), consumed, steps, stepsTargetSoFar, balance, seancesFaites, seancesRatees };
+}
+function renderWeeklyBalance() {
+  const wb = weeklyBalance();
+  const monday = wb.weekDates[0], sunday = wb.weekDates[6];
+  const balanceLabel = wb.balance >= 0 ? "Marge restante" : "Dépassement";
+  const balanceColor = wb.balance >= 0 ? "var(--green)" : "var(--stamp)";
+  const balanceVal = wb.balance >= 0 ? `+${wb.balance}` : `${wb.balance}`;
+  return `
+    <div class="week-range">Semaine du ${dayLabel(monday)} au ${dayLabel(sunday)} — ${wb.loggedDays} jour${wb.loggedDays > 1 ? "s" : ""} renseigné${wb.loggedDays > 1 ? "s" : ""}</div>
+    <div class="week-line"><span>Séances musculation</span><span>${wb.seancesFaites} faites · ${wb.seancesRatees} ratées / ${settings.seancesParSemaine} prévues</span></div>
+    <div class="week-line"><span>Pas cumulés</span><span>${wb.steps.toLocaleString("fr-FR")} / ${wb.stepsTargetSoFar.toLocaleString("fr-FR")} (objectif sur les jours renseignés)</span></div>
+    <div class="week-line"><span>Budget calorique</span><span>${wb.budget} kcal <span style="color:var(--muted)">(muscu + pas déjà inclus)</span></span></div>
+    <div class="week-line"><span>Consommé à date</span><span>${wb.consumed} kcal</span></div>
+    ${wb.loggedDays === 0 ? `<div class="empty-note">Aucun jour renseigné cette semaine pour le moment.</div>` : `<div class="week-balance" style="color:${balanceColor}">${balanceLabel} : ${balanceVal} kcal</div>`}`;
+}
+function refreshWeeklyBalanceBlock() {
+  const block = document.getElementById("weekly-balance-block");
+  if (block) block.innerHTML = renderWeeklyBalance();
+}
+
+// ---- Tampon de pesée ----
+function renderStamp(value) {
+  const v = parseNum(value);
+  const display = v !== null ? v.toFixed(1) : "—";
+  const delta = v !== null ? (v - settings.poidsBase).toFixed(1) : null;
+  return `
+    <div class="stamp-row">
+      <div class="stamp"><span class="val">${display}</span><span class="unit">KG</span></div>
+      <div class="stamp-meta">
+        ${delta !== null
+          ? `<div class="delta">${delta > 0 ? "+" + delta : delta} kg depuis le départ</div>`
+          : `<div class="delta" style="color:var(--muted)">Pas encore pesé aujourd'hui</div>`}
+        <div class="range">Poids de base : ${settings.poidsBase} kg</div>
+      </div>
+    </div>`;
+}
+
+function renderPunchCard() {
+  const days = [];
+  for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days.push(d.toISOString().slice(0, 10)); }
+  const today = todayISO();
+  return `<div class="punch-row">${days.map(d => {
+    const filled = entries[d] && entries[d].weight !== "";
+    const isToday = d === today;
+    return `<div class="punch ${filled ? "filled" : ""} ${isToday ? "today" : ""}" title="${d}">${new Date(d + "T00:00:00").getDate()}</div>`;
+  }).join("")}</div>`;
+}
+
+function ruledItem(label, value, target, unit, accent) {
+  const num = parseNum(value) || 0;
+  const pct = Math.max(0, Math.min(1, num / target));
+  const over = num > target * 1.05;
+  return `
+    <div class="ruled-item">
+      <div class="ruled-head"><span class="ruled-label">${label}</span><span class="ruled-value">${num || 0} / ${Math.round(target)} ${unit}</span></div>
+      <div class="ruled-track"><div class="ruled-fill" style="width:${pct * 100}%;background:${over ? "#B7311E" : accent}"></div></div>
+    </div>`;
+}
+
+function renderCalorieRow(current) {
+  const targets = macroTargets(current);
+  const num = parseNum(current.calories) || 0;
+  const pct = Math.max(0, Math.min(1, num / targets.kcalTarget));
+  const over = num > targets.kcalTarget * 1.05;
+  const base = Math.round(settings.objectifHebdoKcal / 7);
+  let note = `Base : ${base} kcal/j (${settings.objectifHebdoKcal} kcal/semaine).`;
+  if (current.activity === "muscu_fait") note += ` Séance muscu faite : objectif inchangé.`;
+  if (current.activity === "muscu_ratee") note += ` Séance muscu ratée : -${settings.ajustementMuscu} kcal.`;
+  if (current.activity === "course") {
+    const km = parseNum(current.courseKm) || 0;
+    note += ` Course ${km} km : +${Math.round(km * settings.ajustementCoursePerKm)} kcal.`;
+  }
+  const stepsVal = parseNum(current.steps);
+  if (stepsVal !== null) {
+    const diffSteps = stepsVal - settings.stepsCible;
+    const stepsAdj = Math.round((diffSteps / 1000) * settings.kcalPour1000Pas);
+    if (stepsAdj !== 0) {
+      note += ` ${stepsVal.toLocaleString("fr-FR")} pas, soit ${diffSteps > 0 ? "+" : ""}${diffSteps.toLocaleString("fr-FR")} vs objectif (${settings.stepsCible.toLocaleString("fr-FR")}) → ${stepsAdj > 0 ? "+" : ""}${stepsAdj} kcal.`;
+    }
+  } else {
+    note += ` Renseigne tes pas pour ajuster l'objectif (référence ${settings.stepsCible.toLocaleString("fr-FR")} pas).`;
+  }
+  return `
+    <div class="ruled-item">
+      <div class="ruled-head"><span class="ruled-label">Calories</span><span class="ruled-value">${num || 0} / ${targets.kcalTarget} kcal</span></div>
+      <div class="ruled-track"><div class="ruled-fill" style="width:${pct * 100}%;background:${over ? "#B7311E" : "#1B2A4A"}"></div></div>
+      <div class="calorie-note">${note}</div>
+    </div>`;
+}
+
+// ---- Saisie ciblée (sans perte de focus clavier) ----
+function refreshWeightBlock() {
+  const current = getEntry(currentDate);
+  const block = document.getElementById("weight-block");
+  if (block) block.innerHTML = renderStamp(current.weight) + renderPunchCard();
+}
+function onWeightInput(v) { setEntryField("weight", v); refreshWeightBlock(); }
+function onBaseWeightInput(v) {
+  const num = parseNum(v);
+  settings = { ...settings, poidsBase: num !== null ? num : v };
+  saveSettings();
+  refreshWeightBlock();
+}
+
+function refreshStepsBlock() {
+  const current = getEntry(currentDate);
+  const block = document.getElementById("ruled-steps");
+  if (block) block.innerHTML = ruledItem("Pas", current.steps, settings.stepsCible, "", "#2E5FA3");
+}
+function onStepsInput(v) { setEntryField("steps", v); refreshStepsBlock(); refreshNutritionBlock(); refreshWeeklyBalanceBlock(); }
+
+function refreshNutritionBlock() {
+  const current = getEntry(currentDate);
+  const targets = macroTargets(current);
+  const calBlock = document.getElementById("calorie-block");
+  if (calBlock) calBlock.innerHTML = renderCalorieRow(current);
+  const p = document.getElementById("ruled-protein");
+  if (p) p.innerHTML = ruledItem("Protéines", current.protein, targets.proteinTarget, "g", "#1E7A5C");
+  const f = document.getElementById("ruled-fat");
+  if (f) f.innerHTML = ruledItem("Lipides", current.fat, targets.fatTarget, "g", "#A9660A");
+  const c = document.getElementById("ruled-carbs");
+  if (c) c.innerHTML = ruledItem("Glucides", current.carbs, targets.carbsTarget, "g", "#52607A");
+}
+function onCaloriesInput(v) { setEntryField("calories", v); refreshNutritionBlock(); refreshWeeklyBalanceBlock(); }
+function onProteinInput(v) { setEntryField("protein", v); refreshNutritionBlock(); }
+function onFatInput(v) { setEntryField("fat", v); refreshNutritionBlock(); }
+function onCarbsInput(v) { setEntryField("carbs", v); refreshNutritionBlock(); }
+function onKmInput(v) { setEntryField("courseKm", v); refreshNutritionBlock(); }
+function onNoteInput(v) { setEntryField("note", v); }
+function setActivity(a) { setEntryField("activity", a); render(); }
+
+function onSettingChange(field, v) {
+  const num = parseNum(v);
+  settings = { ...settings, [field]: num !== null ? num : v };
+  saveSettings();
+  refreshNutritionBlock();
+  refreshWeightBlock();
+  refreshStepsBlock();
+  refreshWeeklyBalanceBlock();
+}
+
+function renderChart() {
+  const data = weeklyAverages();
+  if (data.length <= 1) return `<div class="empty-note">Note au moins deux pesées pour voir la tendance.</div>`;
+  const w = 440, h = 140, padL = 30, padR = 8, padT = 10, padB = 20;
+  const weights = data.map(d => d.weight);
+  const minY = Math.min(...weights) - 1, maxY = Math.max(...weights) + 1;
+  const xFor = (i) => padL + (i / (data.length - 1)) * (w - padL - padR);
+  const yFor = (v) => padT + ((maxY - v) / (maxY - minY)) * (h - padT - padB);
+  const weightPts = data.map((d, i) => `${xFor(i)},${yFor(d.weight)}`).join(" ");
+  const avgPts = data.map((d, i) => `${xFor(i)},${yFor(d.avg)}`).join(" ");
+  const baseY = yFor(settings.poidsBase);
+  const labelEvery = Math.ceil(data.length / 5);
+  let labels = "";
+  data.forEach((d, i) => {
+    if (i % labelEvery === 0 || i === data.length - 1) {
+      labels += `<text x="${xFor(i)}" y="${h - 4}" font-size="9" fill="#8B95A5" text-anchor="middle" font-family="IBM Plex Mono">${dayLabel(d.date).slice(0,5)}</text>`;
+    }
+  });
+  return `
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="100%">
+      <line x1="${padL}" y1="${baseY}" x2="${w - padR}" y2="${baseY}" stroke="#B7311E" stroke-width="1.5" stroke-dasharray="3 4"/>
+      <polyline points="${weightPts}" fill="none" stroke="#D9DEE6" stroke-width="1.5"/>
+      <polyline points="${avgPts}" fill="none" stroke="#1B2A4A" stroke-width="2.5"/>
+      ${labels}
+    </svg>`;
+}
+
+function renderHistory() {
+  const dates = [...sortedDates()].reverse();
+  if (dates.length === 0) return `<div class="empty-note">Le carnet est vierge pour l'instant.</div>`;
+  return dates.map(d => `
+    <div class="history-row" onclick="setDate('${d}')">
+      <span class="history-date">${dayLabel(d)}</span>
+      <span class="history-weight">${entries[d].weight} kg</span>
+      <span class="history-note">${entries[d].note || ""}</span>
+    </div>`).join("");
+}
+
+// ---- Mesures hebdo ----
+let measureDraft = { taille: "", biceps: "", cuisses: "", buste: "" };
+function onMeasureDraftInput(field, v) { measureDraft[field] = v; }
+function saveMeasure() {
+  const d = todayISO();
+  mesures[d] = { ...measureDraft };
+  saveMeasures();
+  measureDraft = { taille: "", biceps: "", cuisses: "", buste: "" };
+  render();
+}
+function renderMeasureHistory() {
+  const dates = Object.keys(mesures).sort().reverse();
+  if (dates.length === 0) return `<div class="empty-note">Aucune mesure enregistrée.</div>`;
+  return dates.map(d => {
+    const m = mesures[d];
+    return `<div class="measure-row"><span>${dayLabel(d)}</span><span>Taille ${m.taille || "—"} · Biceps ${m.biceps || "—"} · Cuisses ${m.cuisses || "—"} · Buste ${m.buste || "—"}</span></div>`;
+  }).join("");
+}
+
+const SUPPLEMENTS = [
+  { nom: "Vitamine D3", dose: "4000 UI", quand: "Avec un repas", indications: "Système immunitaire + métabolisme + os" },
+  { nom: "Créatine", dose: "5 g", quand: "Repas post-training et jours de repos", indications: "Force + durée de l'effort augmentées" },
+  { nom: "Mélatonine", dose: "1–5 mg", quand: "30-60 min avant le coucher", indications: "Facilite l'endormissement" },
+  { nom: "Magnésium", dose: "300-400 mg", quand: "30-60 min avant le coucher", indications: "Sommeil + contraction musculaire" },
+  { nom: "Zinc", dose: "15-30 µg", quand: "Matin", indications: "Système immunitaire + hormones" },
+  { nom: "Oméga-3", dose: "2000-3000 mg", quand: "Matin et/ou soir", indications: "Vaisseaux sanguins + anti-inflammatoire" },
+];
+function renderSupplements() {
+  return SUPPLEMENTS.map(s => `
+    <div class="supp-row">
+      <div class="supp-name">${s.nom}</div>
+      <div class="supp-dose">${s.dose} — ${s.quand}</div>
+      <div class="supp-detail">${s.indications}</div>
+    </div>`).join("");
+}
+
+function render() {
+  const current = getEntry(currentDate);
+  const dates = sortedDates();
+  const avgData = weeklyAverages();
+  const weekAvg = avgData.length ? avgData[avgData.length - 1].avg : null;
+  const targets = macroTargets(current);
+
+  document.getElementById("app").innerHTML = `
+    <div class="header">
+      <div>
+        <div class="eyebrow">Carnet de suivi</div>
+        <div class="title">CARNET<span class="accent">.</span></div>
+        <div class="subtitle">Base ${settings.poidsBase} kg · ${weekAvg !== null ? "moyenne " + weekAvg + " kg" : "en cours"}</div>
+      </div>
+      <div class="save-state" id="save-state"></div>
+    </div>
+
+    <div class="date-row">
+      <input type="date" value="${currentDate}" onchange="setDate(this.value)">
+      ${currentDate !== todayISO() ? `<button class="today-btn" onclick="goToday()">Ce jour</button>` : ""}
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Pesée du jour</div>
+      <div id="weight-block">${renderStamp(current.weight)}</div>
+      <div class="weight-input-row">
+        <label>Aujourd'hui</label>
+        <input type="text" inputmode="decimal" placeholder="ex : 74,4" value="${current.weight}" oninput="onWeightInput(this.value)">
+      </div>
+      <div class="weight-input-row" style="border-top:none;padding-top:0;margin-top:8px">
+        <label>Poids départ</label>
+        <input type="text" inputmode="decimal" value="${settings.poidsBase}" oninput="onBaseWeightInput(this.value)">
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Activité du jour</div>
+      <div class="activity-row">
+        <button class="activity-btn ${current.activity === "off" ? "active" : ""}" onclick="setActivity('off')">Repos</button>
+        <button class="activity-btn ${current.activity === "muscu_fait" ? "active" : ""}" onclick="setActivity('muscu_fait')">Muscu faite</button>
+        <button class="activity-btn ${current.activity === "muscu_ratee" ? "active" : ""}" onclick="setActivity('muscu_ratee')">Muscu ratée (-${settings.ajustementMuscu})</button>
+        <button class="activity-btn ${current.activity === "course" ? "active" : ""}" onclick="setActivity('course')">Course</button>
+      </div>
+      ${current.activity === "course" ? `
+      <div class="km-row">
+        <label>Distance</label>
+        <input type="text" inputmode="decimal" placeholder="km" value="${current.courseKm}" oninput="onKmInput(this.value)">
+      </div>` : ""}
+      <div class="steps-row" style="display:block">
+        <div id="ruled-steps">${ruledItem("Pas", current.steps, settings.stepsCible, "", "#2E5FA3")}</div>
+        <input type="number" inputmode="numeric" placeholder="0" value="${current.steps}" oninput="onStepsInput(this.value)" style="margin-top:8px;width:100%">
+      </div>
+      <div class="note-row">
+        <label>Note (optionnel)</label>
+        <input type="text" placeholder="ex : malade, déplacement, diet break..." value="${current.note}" oninput="onNoteInput(this.value)">
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Feuille nutrition</div>
+      <div id="calorie-block">${renderCalorieRow(current)}</div>
+      <div id="ruled-protein">${ruledItem("Protéines", current.protein, targets.proteinTarget, "g", "#1E7A5C")}</div>
+      <div id="ruled-fat">${ruledItem("Lipides", current.fat, targets.fatTarget, "g", "#A9660A")}</div>
+      <div id="ruled-carbs">${ruledItem("Glucides", current.carbs, targets.carbsTarget, "g", "#52607A")}</div>
+      <div class="field-grid">
+        <div class="field"><label>Calories</label><input type="number" inputmode="numeric" value="${current.calories}" oninput="onCaloriesInput(this.value)"></div>
+        <div class="field"><label>Protéines</label><input type="number" inputmode="numeric" value="${current.protein}" oninput="onProteinInput(this.value)"></div>
+        <div class="field"><label>Lipides</label><input type="number" inputmode="numeric" value="${current.fat}" oninput="onFatInput(this.value)"></div>
+      </div>
+      <div class="field-grid" style="grid-template-columns:1fr">
+        <div class="field"><label>Glucides</label><input type="number" inputmode="numeric" value="${current.carbs}" oninput="onCarbsInput(this.value)"></div>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Bilan calorique — semaine</div>
+      <div id="weekly-balance-block">${renderWeeklyBalance()}</div>
+    </div>
+
+    <div class="sheet">
+      <div class="sheet-label">Bilan</div>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="label">Moy. 7 jours</div><div class="value">${weekAvg !== null ? weekAvg : "—"}</div></div>
+        <div class="summary-card"><div class="label">Écart départ</div><div class="value">${weekAvg !== null ? (weekAvg - settings.poidsBase).toFixed(1) : "—"}</div></div>
+      </div>
+      <div class="chart-wrap">${renderChart()}</div>
+    </div>
+
+    <button class="history-toggle" onclick="toggleHistory()">${showHistory ? "Masquer le carnet" : `Voir le carnet (${dates.length} pesées)`}</button>
+    ${showHistory ? `<div class="sheet">${renderHistory()}</div>` : ""}
+    ${current.weight !== "" ? `<button class="delete-btn" onclick="deleteEntry()">Effacer la pesée du ${dayLabel(currentDate)}</button>` : ""}
+
+    <button class="history-toggle" onclick="toggleMeasures()" style="margin-top:16px">${showMeasures ? "Masquer les mesures" : "Mesures hebdo (tour de taille, biceps...)"}</button>
+    ${showMeasures ? `
+    <div class="sheet">
+      <div class="sheet-label">Nouvelle mesure — ${dayLabel(todayISO())}</div>
+      <div class="measure-form">
+        <div class="field"><label>Tour de taille</label><input type="text" inputmode="decimal" oninput="onMeasureDraftInput('taille', this.value)"></div>
+        <div class="field"><label>Biceps</label><input type="text" inputmode="decimal" oninput="onMeasureDraftInput('biceps', this.value)"></div>
+        <div class="field"><label>Cuisses</label><input type="text" inputmode="decimal" oninput="onMeasureDraftInput('cuisses', this.value)"></div>
+        <div class="field"><label>Buste</label><input type="text" inputmode="decimal" oninput="onMeasureDraftInput('buste', this.value)"></div>
+      </div>
+      <button class="measure-btn" onclick="saveMeasure()">Enregistrer la mesure</button>
+      <div style="margin-top:14px">${renderMeasureHistory()}</div>
+    </div>` : ""}
+
+    <button class="history-toggle" onclick="toggleSettings()" style="margin-top:16px">${showSettings ? "Masquer les réglages" : "Réglages du programme"}</button>
+    ${showSettings ? `
+    <div class="sheet">
+      <div class="sheet-label">Paramètres</div>
+      <div class="settings-grid">
+        <div class="settings-field"><label>Poids de base (kg)</label><input type="text" inputmode="decimal" value="${settings.poidsBase}" onchange="onSettingChange('poidsBase', this.value)"></div>
+        <div class="settings-field"><label>Objectif kcal/semaine</label><input type="number" value="${settings.objectifHebdoKcal}" onchange="onSettingChange('objectifHebdoKcal', this.value)"></div>
+        <div class="settings-field"><label>Protéines cible (g)</label><input type="number" value="${settings.proteinCibleJour}" onchange="onSettingChange('proteinCibleJour', this.value)"></div>
+        <div class="settings-field"><label>Lipides cible/j (g)</label><input type="number" value="${settings.lipidesCibleJour}" onchange="onSettingChange('lipidesCibleJour', this.value)"></div>
+        <div class="settings-field"><label>Pas cible / jour</label><input type="number" value="${settings.stepsCible}" onchange="onSettingChange('stepsCible', this.value)"></div>
+        <div class="settings-field"><label>Ajust. muscu (kcal)</label><input type="number" value="${settings.ajustementMuscu}" onchange="onSettingChange('ajustementMuscu', this.value)"></div>
+        <div class="settings-field"><label>Séances muscu / sem.</label><input type="number" value="${settings.seancesParSemaine}" onchange="onSettingChange('seancesParSemaine', this.value)"></div>
+        <div class="settings-field"><label>kcal / km couru</label><input type="number" value="${settings.ajustementCoursePerKm}" onchange="onSettingChange('ajustementCoursePerKm', this.value)"></div>
+        <div class="settings-field"><label>kcal / 1000 pas (sem.)</label><input type="number" value="${settings.kcalPour1000Pas}" onchange="onSettingChange('kcalPour1000Pas', this.value)"></div>
+      </div>
+      <div class="settings-note">Chaque jour part sur ${Math.round(settings.objectifHebdoKcal/7)} kcal. Une séance muscu ratée retire ${settings.ajustementMuscu} kcal ce jour-là ; une séance faite ne change rien. Chaque tranche de 1000 pas au-dessus ou en-dessous de ${settings.stepsCible.toLocaleString("fr-FR")} ajoute ou retire ${settings.kcalPour1000Pas} kcal à l'objectif du jour. Le bilan de la semaine additionne simplement ces objectifs quotidiens et les compare au total réellement consommé.</div>
+    </div>` : ""}
+
+    <button class="history-toggle" onclick="document.getElementById('supp-panel').style.display = document.getElementById('supp-panel').style.display === 'none' ? 'block' : 'none'" style="margin-top:16px">Compléments recommandés</button>
+    <div class="sheet" id="supp-panel" style="display:none">
+      <div class="sheet-label">Compléments</div>
+      ${renderSupplements()}
+    </div>
+  `;
+}
+
+render();
+</script>
+</body>
+</html>
